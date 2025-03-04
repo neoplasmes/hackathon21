@@ -7,7 +7,7 @@ app = FastAPI()
 
 # Загрузка данных из файла parsed_data.json
 def load_data():
-    with open("backend/parsed_dash.json", "r", encoding="utf-8") as file:
+    with open("parsed_data.json", "r", encoding="utf-8") as file:
         data = json.load(file)
     return data
 
@@ -19,5 +19,5 @@ async def get_data():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="localhost", port=8000)
 
