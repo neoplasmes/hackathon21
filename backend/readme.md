@@ -1,10 +1,13 @@
 чтобы установить зависимости:
-pip install -r requirements.txt
+# Версия питона
+Для нормальной работы необходимо установить python 3.10 (проверить установленные версии можно через "py -0")
+Если его нет, в cmd вводим: winget install python.python.3.10
 
-pip freeze > requirements.txt 
+# Установка зависимостей
+Перемещаемся внутри cmd в папку /backend и вводим py -3.10 -m pip install -r requirements.txt
 
-это означает сгенерировать зависимость
+# Запуск файла НЕ main.py
+py -3.10 <название.py>
 
-uvicorn backend.main:add 
-
-Для запуска сервера
+# Запуск main.py
+unicorn main:add

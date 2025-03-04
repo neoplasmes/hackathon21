@@ -177,7 +177,9 @@ class ValidatorSimple:
             gt = row.ground_truth
             answer = row.answer
             context = row.contexts
+
             scores = self.score_sample(answer, gt, context)
+
             if not res:
                 res = scores
             else:
@@ -185,4 +187,15 @@ class ValidatorSimple:
                     res[k].extend(v)
         for k, v in res.items():
             res[k] = np.mean(res[k])
+        return res
+    
+    def validate_rag_new(self, test_set: pd.DataFrame):
+        res = []
+        for _, row in tqdm(test_set.iterrows(), "score_sample"):
+            gt = row.ground_truth
+            answer = row.answer
+            context = row.contexts
+
+            res.append(self.score_sample(answer, gt, context))
+
         return res
