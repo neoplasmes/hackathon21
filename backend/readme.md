@@ -5,6 +5,6 @@ pip freeze > requirements.txt
 
 это означает сгенерировать зависимость
 
-uvicorn backend.main:a 
+uvicorn backend.main:app
 
 Для запуска сервера
