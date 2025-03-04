@@ -163,32 +163,6 @@ def logical_consistency_using_bertscore(
 
     return score[0]  # Возвращаем первый элемент из списка (поскольку у нас только одна пара)
 
-def evaluate_consistency(
-    df: pd.DataFrame,
-    model_type: str = "bert-base-uncased",
-) -> pd.DataFrame:
-    """
-    Оценка логической согласованности для всего датасета.
-
-    Параметры:
-    df (pd.DataFrame): Датасет с колонками 'context' и 'answer'.
-    model_type (str): Модель для BertScore.
-
-    Возвращает:
-    pd.DataFrame: Датасет с логической согласованностью для каждой строки.
-    """
-    consistency_scores = []
-
-    # Проход по всем строкам датасета
-    for _, row in tqdm(df.iterrows(), total=len(df), desc="Evaluating logical consistency"):
-        context = row['context']
-        answer = row['answer']
-        score = logical_consistency_using_bertscore(context, answer, model_type)
-        consistency_scores.append(score)
-    
-    df['logical_consistency'] = consistency_scores
-    return df
-
 def document_fidelity(answer: str, contexts: List[str]) -> float:
     """
     Вычисляет метрику Document Fidelity на основе ROUGE-2.
@@ -250,6 +224,30 @@ class ValidatorSimple:
                 ground_truth=ground_truth,
                 answer=answer,
             )
+        ]
+        scores["contextual_relevance"]=[
+            contextual_relevance(
+                ground_truth,
+                context,
+            )
+        ]
+        scores["document_fidelity"]=[
+            document_fidelity(
+                answer,
+                context,
+            )
+        ]
+        scores["logical_consistency_using_bertscore"]=[
+            logical_consistency_using_bertscore(
+                context,
+                answer,
+            )
+        ]
+        scores["CVS"]=[
+            scores["contextual_relevance"]*0.4+scores["document_fidelity"]*0.3+scores["logical_consistency_using_bertscore"]*0.3 #финальная формула итоговой взвешенной оценки , но чувак я нихуя не понял зачем эта формула нужна ведь она отвечает просто за то что насколько ответ хороший или нет
+        ]
+        scores["new_CVS"]=[
+            (scores["logical_consistency_using_bertscore"]*100/scores["document_fidelity"]*100/scores["contextual_relevance"]*100)/100 #новая формула, посмотри норм не норм или че
         ]
         if self.neural:
             scores["answer_correctness_neural"] = [
