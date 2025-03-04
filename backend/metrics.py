@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 import evaluate
 import numpy as np
@@ -112,6 +112,102 @@ def answer_correctness_neural(
     )["f1"]
 
     return score
+
+
+def contextual_relevance(ground_truth: str, contexts: List[str])->float:
+    """
+    Оценка релевантности извлеченного контекста к правильному ответу.
+    
+    - ROUGE-2: n-граммное совпадение (важно для точных фраз)
+    - BLEU-2: precision-похожесть (оценивает точные совпадения)
+    - chrF: n-граммы символов (устойчив к небольшим вариациям)
+    - BERTScore: семантическая схожесть (учитывает смысл)
+    """
+
+    
+    bleu_scores = []
+
+    for context in contexts:
+        # BLEU-2 (Precision-based)
+        bleu_score = bleu.compute(predictions=[context], references=[ground_truth], max_order=2)["bleu"]
+        bleu_scores.append(bleu_score)
+
+
+    # Усредняем значения по всем retrieved contexts
+    return {
+        "BLEU-2": np.mean(bleu_scores)
+    }
+
+def logical_consistency_using_bertscore(
+    context: str,
+    answer: str,
+    model_type: str = "bert-base-uncased",
+) -> float:
+    """
+    Оценка логической согласованности ответа с контекстом через BertScore.
+    Предполагается, что высокая схожесть (близость эмбеддингов) указывает на логическую согласованность.
+
+    Параметры:
+    context (str): Контекст или вопрос.
+    answer (str): Ответ.
+    model_type (str): Модель для эмбеддингов (по умолчанию 'bert-base-uncased').
+
+    Возвращает:
+    float: Оценка логической согласованности.
+    """
+    score = bertscore.compute(
+        predictions=[str(answer)],
+        references=[str(context)],
+        model_type=model_type,
+    )["f1"]
+
+    return score[0]  # Возвращаем первый элемент из списка (поскольку у нас только одна пара)
+
+def evaluate_consistency(
+    df: pd.DataFrame,
+    model_type: str = "bert-base-uncased",
+) -> pd.DataFrame:
+    """
+    Оценка логической согласованности для всего датасета.
+
+    Параметры:
+    df (pd.DataFrame): Датасет с колонками 'context' и 'answer'.
+    model_type (str): Модель для BertScore.
+
+    Возвращает:
+    pd.DataFrame: Датасет с логической согласованностью для каждой строки.
+    """
+    consistency_scores = []
+
+    # Проход по всем строкам датасета
+    for _, row in tqdm(df.iterrows(), total=len(df), desc="Evaluating logical consistency"):
+        context = row['context']
+        answer = row['answer']
+        score = logical_consistency_using_bertscore(context, answer, model_type)
+        consistency_scores.append(score)
+    
+    df['logical_consistency'] = consistency_scores
+    return df
+
+# Пример использования с датасетом
+data = {
+    'context': [
+        "The sun rises in the east.",
+        "The Earth is the third planet from the sun.",
+        "Water boils at 100 degrees Celsius at sea level."
+    ],
+    'answer': [
+        "The sun rises in the west.",
+        "Earth is the third planet from the sun.",
+        "Water boils at 80 degrees Celsius."
+    ]
+}
+
+df = pd.DataFrame(data)
+result_df = evaluate_consistency(df)
+
+# Выводим результат
+print(result_df[['context', 'answer', 'logical_consistency']])
 
 
 class ValidatorSimple:
