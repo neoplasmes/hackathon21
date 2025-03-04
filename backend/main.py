@@ -1,11 +1,23 @@
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 import json
-from metrics import ValidatorSimple
-from func_to_call import parse_all_data, parse_data_with_time
+import os
 
-data_v2 = parse_data_with_time('united_data.json')
+app = FastAPI()
 
-with open('parsed_dash.json', 'w', encoding='utf-8') as f:
-    json.dump(data_v2, f, ensure_ascii=False)
+# Загрузка данных из файла parsed_data.json
+def load_data():
+    with open("backend/parsed_dash.json", "r", encoding="utf-8") as file:
+        data = json.load(file)
+    return data
 
-print(1)
-print(data_v2)
+@app.get("/data", response_class=JSONResponse)
+async def get_data():
+    data = load_data()
+    # Возвращаем первые 15 объектов
+    return data[:15]
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
