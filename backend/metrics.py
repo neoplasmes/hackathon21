@@ -189,26 +189,26 @@ def evaluate_consistency(
     df['logical_consistency'] = consistency_scores
     return df
 
-# Пример использования с датасетом
-data = {
-    'context': [
-        "The sun rises in the east.",
-        "The Earth is the third planet from the sun.",
-        "Water boils at 100 degrees Celsius at sea level."
-    ],
-    'answer': [
-        "The sun rises in the west.",
-        "Earth is the third planet from the sun.",
-        "Water boils at 80 degrees Celsius."
-    ]
-}
+def document_fidelity(answer: str, contexts: List[str]) -> float:
+    """
+    Вычисляет метрику Document Fidelity на основе ROUGE-2.
 
-df = pd.DataFrame(data)
-result_df = evaluate_consistency(df)
-
-# Выводим результат
-print(result_df[['context', 'answer', 'logical_consistency']])
-
+    :param answer: Ответ модели.
+    :param contexts: Список документов (контекстов).
+    :return: Среднее значение ROUGE-2 между ответом и документами.
+    """
+    fidelity_scores = []
+    
+    for context in contexts:
+        # Вычисляем ROUGE-2 между ответом и каждым документом
+        score = rouge.compute(
+            predictions=[answer],
+            references=[context],
+        )["rouge2"]
+        fidelity_scores.append(score)
+    
+    # Возвращаем среднее значение ROUGE-2
+    return np.mean(fidelity_scores)
 
 class ValidatorSimple:
     """
