@@ -53,6 +53,7 @@ export const CheckboxGroup = ({ items, stateDispatch, filtersState, groupID }) =
 
                     return (
                         <FormControlLabel
+                            key={key}
                             slotProps={{ typography: { fontSize: "0.75rem" } }}
                             label={value}
                             control={
