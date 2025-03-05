@@ -1,21 +1,29 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import json
-import os
 
 app = FastAPI()
 
-# Загрузка данных из файла parsed_data.json
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],  # Allows all headers
+)
+
+# Загрузка данных из файла metrics_DB.json
 def load_data():
-    with open("parsed_data.json", "r", encoding="utf-8") as file:
+    with open("metrics_DB.json", "r", encoding="utf-8") as file:
         data = json.load(file)
     return data
 
+fakeDB = load_data()
+
 @app.get("/data", response_class=JSONResponse)
 async def get_data():
-    data = load_data()
-    # Возвращаем первые 15 объектов
-    return data[:15]
+    return fakeDB
 
 if __name__ == "__main__":
     import uvicorn

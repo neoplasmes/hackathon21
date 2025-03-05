@@ -1,7 +1,8 @@
 import json
+from typing import List, Dict
 import pandas as pd
 
-from init_parser import parse_data_with_time
+from init_parser import parse_data_with_time, parse_contexts, extract_tags, clean_text
 
 def _parse_united_data():
     '''
@@ -13,6 +14,47 @@ def _parse_united_data():
     with open('parsed_data.json', 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False)
 
+# для расчёта метрик всего сета (united_data) и подготовке к хранению в псевдо-БД
+def prepare_row_for_metrics_calculation(row: Dict) -> Dict:
+    parsed = {
+        'selected_role': row['Выбранная роль'],
+        'campus': row['Кампус'],
+        'education_level': row['Уровень образования'],
+        'question_category': row['Категория вопроса'],
+        'question': clean_text(row['Вопрос пользователя']),
+        'user_filters': row['user_filters'],
+        'question_filters': row['question_filters'],
+        'saiga_answer': clean_text(row['Saiga']),
+        'giga_answer': clean_text(row['Giga']),
+        'answer': clean_text(row['Ответ AI']), # ответ хсе бота
+        'winner': row['Кто лучше?'],
+        'comment': row['Комментарий'],
+        # 'contexts': parse_contexts(row['Ресурсы для ответа']),
+        'response_time': row['Время ответа модели (сек)'],
+        'refined': row.get('Уточнённый ответ пользователя') != None,
+        'refined_response_time': row.get('Время ответа модели на уточненный вопрос (сек)')
+    }
+
+    # keysToCopy =  ["selected_role", "campus", "education_level", "question_category"]
+
+    # processedRow = {key: row.get(key, None) for key in keysToCopy}
+    # parsed['question'] = parsed['user_question']
+    # parsed['answer'] = parsed['hse_ai_answer']
+    
+    ground_truth = None
+    if parsed['winner'] == 'Saiga':
+        ground_truth = parsed['saiga_answer']
+    else:
+        ground_truth = parsed['giga_answer']
+    parsed['ground_truth'] = ground_truth
+
+    extended_contexts = parse_contexts(row['Ресурсы для ответа'])
+    contexts = []
+    for ctx in extended_contexts:
+        contexts.append(ctx['text'])
+    parsed['contexts'] = contexts
+
+    return parsed
 
 def prepare_data_for_metrics_calculation(path: str) -> pd.DataFrame:
     '''

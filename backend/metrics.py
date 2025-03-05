@@ -28,6 +28,7 @@ def context_recall(ground_truth: str, contexts: List[str])->float:
             )["rouge2"]
         )
 
+    print('calculated ctx recall')
     return np.mean(rs)
 
 
@@ -40,6 +41,7 @@ def context_precision(ground_truth: str, contexts: List[str])->float:
     max_order - max n-grams to count
 
     return: average bleu (precision2, w/o brevity penalty) for all contexts.
+    Чисто совпадение слов
     """
     bs = []
     for c in contexts:
@@ -55,7 +57,29 @@ def context_precision(ground_truth: str, contexts: List[str])->float:
         except ZeroDivisionError:
             bs.append(0)
 
+    print('calculated ctx prec')
     return np.mean(bs)
+
+def context_relevance(ground_truth: str, contexts: List[str]) -> float:
+    """
+    Оценка релевантности извлеченного контекста к правильному ответу с помощью BERTScore.
+    
+    - BERTScore: оценивает семантическую схожесть на уровне эмбеддингов.
+    Совпадение по смыслу
+    """
+    bert_scores = []
+    
+    for context in contexts:
+        score = bertscore.compute(
+            predictions=[context],
+            references=[ground_truth],
+            model_type="bert-base-uncased"  # Можно выбрать другую предобученную модель
+        )["f1"][0]  # Берем F1-оценку из результата
+        bert_scores.append(score)
+
+    print('calculated ctx relev')
+
+    return np.mean(bert_scores)
 
 
 def answer_correctness_literal(
@@ -64,7 +88,7 @@ def answer_correctness_literal(
     char_order: int = 6,
     word_order: int = 2,
     beta: float = 1,
-)->float:
+):
     """
     Calc chrF btw answer and ground truth.
     Interpretation: lingustic match btw answer and desired answer.
@@ -85,14 +109,16 @@ def answer_correctness_literal(
         beta=beta,
     )["score"]
 
-    return score
+    print('calculated acl')
+
+    return score/100
 
 
 def answer_correctness_neural(
     ground_truth: str,
     answer: str,
     model_type: str = "cointegrated/rut5-base",
-) -> float:
+):
     """
     Calc bertscore btw answer and ground truth.
     Interpretation: semantic cimilarity btw answer and desired answer.
@@ -109,40 +135,17 @@ def answer_correctness_neural(
         batch_size=1,
         model_type=model_type,
         num_layers=11,
-    )["f1"]
+    )["f1"][0]
+
+    print('calculated acn')
 
     return score
-
-
-def contextual_relevance(ground_truth: str, contexts: List[str])->float:
-    """
-    Оценка релевантности извлеченного контекста к правильному ответу.
-    
-    - ROUGE-2: n-граммное совпадение (важно для точных фраз)
-    - BLEU-2: precision-похожесть (оценивает точные совпадения)
-    - chrF: n-граммы символов (устойчив к небольшим вариациям)
-    - BERTScore: семантическая схожесть (учитывает смысл)
-    """
-
-    
-    bleu_scores = []
-
-    for context in contexts:
-        # BLEU-2 (Precision-based)
-        bleu_score = bleu.compute(predictions=[context], references=[ground_truth], max_order=2)["bleu"]
-        bleu_scores.append(bleu_score)
-
-
-    # Усредняем значения по всем retrieved contexts
-    return {
-        "BLEU-2": np.mean(bleu_scores)
-    }
 
 def logical_consistency_using_bertscore(
     context: str,
     answer: str,
-    model_type: str = "bert-base-uncased",
-) -> float:
+    model_type: str = "distilbert-base-uncased",
+):
     """
     Оценка логической согласованности ответа с контекстом через BertScore.
     Предполагается, что высокая схожесть (близость эмбеддингов) указывает на логическую согласованность.
@@ -159,30 +162,27 @@ def logical_consistency_using_bertscore(
         predictions=[str(answer)],
         references=[str(context)],
         model_type=model_type,
-    )["f1"]
+    )["f1"][0]
 
-    return score[0]  # Возвращаем первый элемент из списка (поскольку у нас только одна пара)
+    print('calculated log cons')
 
-def document_fidelity(answer: str, contexts: List[str]) -> float:
-    """
-    Вычисляет метрику Document Fidelity на основе ROUGE-2.
+    return score
 
-    :param answer: Ответ модели.
-    :param contexts: Список документов (контекстов).
-    :return: Среднее значение ROUGE-2 между ответом и документами.
-    """
+def document_fidelity(answer: str, contexts: List[str]):
     fidelity_scores = []
     
     for context in contexts:
-        # Вычисляем ROUGE-2 между ответом и каждым документом
+        # Вычисляем ROUGE-1 между ответом и каждым документом
         score = rouge.compute(
             predictions=[answer],
             references=[context],
-        )["rouge2"]
+        )["rouge1"]  # Используем ROUGE-1 вместо ROUGE-2
         fidelity_scores.append(score)
+
+    print('Calculated Document Fidelity (ROUGE-1)')
     
-    # Возвращаем среднее значение ROUGE-2
-    return np.mean(fidelity_scores)
+    # Возвращаем среднее значение ROUGE-1
+    return np.mean(fidelity_scores) if fidelity_scores else 0.0
 
 class ValidatorSimple:
     """
@@ -213,42 +213,28 @@ class ValidatorSimple:
                 context,
             )
         ]
+
         scores["context_precision"] = [
             context_precision(
                 ground_truth,
                 context,
             )
         ]
+
+        scores["context_relevance"]=[
+            context_relevance(
+                ground_truth,
+                context,
+            )
+        ]
+
         scores["answer_correctness_literal"] = [
             answer_correctness_literal(
                 ground_truth=ground_truth,
                 answer=answer,
             )
         ]
-        scores["contextual_relevance"]=[
-            contextual_relevance(
-                ground_truth,
-                context,
-            )
-        ]
-        scores["document_fidelity"]=[
-            document_fidelity(
-                answer,
-                context,
-            )
-        ]
-        scores["logical_consistency_using_bertscore"]=[
-            logical_consistency_using_bertscore(
-                context,
-                answer,
-            )
-        ]
-        scores["CVS"]=[
-            scores["contextual_relevance"]*0.4+scores["document_fidelity"]*0.3+scores["logical_consistency_using_bertscore"]*0.3 #финальная формула итоговой взвешенной оценки , но чувак я нихуя не понял зачем эта формула нужна ведь она отвечает просто за то что насколько ответ хороший или нет
-        ]
-        scores["new_CVS"]=[
-            (scores["logical_consistency_using_bertscore"]*100/scores["document_fidelity"]*100/scores["contextual_relevance"]*100)/100 #новая формула, посмотри норм не норм или че
-        ]
+
         if self.neural:
             scores["answer_correctness_neural"] = [
                 answer_correctness_neural(
@@ -256,6 +242,21 @@ class ValidatorSimple:
                     answer=answer,
                 )
             ]
+
+        scores["document_fidelity"]=[
+            document_fidelity(
+                answer,
+                context,
+            )
+        ]
+
+        scores["logical_consistency"]=[
+            logical_consistency_using_bertscore(
+                context,
+                answer,
+            )
+        ]
+
         return scores
 
     def validate_rag(
@@ -283,13 +284,40 @@ class ValidatorSimple:
             res[k] = np.mean(res[k])
         return res
     
-    def validate_rag_new(self, test_set: pd.DataFrame):
+    def validate_rag_new(self, test_set: pd.DataFrame, weigths: Dict = {}):
+        CR_weigth = weigths.get('CR', 0.4)
+        DF_weigth = weigths.get('DF', 0.2)
+        LAC_weigth = weigths.get('LAC', 0.4)
+
         res = []
         for _, row in tqdm(test_set.iterrows(), "score_sample"):
-            gt = row.ground_truth
+            ground_truth = row.ground_truth
             answer = row.answer
             context = row.contexts
 
-            res.append(self.score_sample(answer, gt, context))
+            score = self.score_sample(answer, ground_truth, context)
+            score['Deception Probability'] = (CR_weigth * score['context_relevance'] + DF_weigth * score['document_fidelity'] + 
+                                              LAC_weigth * score['answer_correctness_literal']) / (CR_weigth + DF_weigth + LAC_weigth) * (score['answer_correctness_neural'] * score['logical_consistency'])
+
+            res.append(score)
 
         return res
+    
+    # для расчёта метрик всего сета
+    def calc_new_metrics_for_row(self, row: Dict, weights: Dict = {}) -> Dict:
+        CR_weigth = weights.get('CR', 0.4)
+        DF_weigth = weights.get('DF', 0.3)
+        LAC_weigth = weights.get('LAC', 0.3)
+
+        ground_truth = row['ground_truth']
+        answer = row['answer']
+        context = row['contexts']
+
+        bad_score = self.score_sample(answer, ground_truth, context)
+
+        score = {key: float(value[0]) for key, value in bad_score.items()}
+
+        score['Deception Probability'] = 1 - ((CR_weigth * score['context_relevance'] + DF_weigth * score['document_fidelity'] + 
+                                            LAC_weigth * score['answer_correctness_literal']) / (CR_weigth + DF_weigth + LAC_weigth) * (score['answer_correctness_neural'] * score['logical_consistency']))
+        
+        return score

@@ -24,23 +24,22 @@ def _parse_data(file_path: str, include_time: bool) -> List[Dict[str, Any]]:
             'campus': item['Кампус'],
             'education_level': item['Уровень образования'],
             'question_category': item['Категория вопроса'],
-            'user_question': _clean_text(item['Вопрос пользователя']),
+            'user_question': clean_text(item['Вопрос пользователя']),
             'user_filters': item['user_filters'],
             'question_filters': item['question_filters'],
-            'saiga_answer': _clean_text(item['Saiga']),
-            'giga_answer': _clean_text(item['Giga']),
-            'hse_ai_answer': _clean_text(item['Ответ AI']), # добавлено
+            'saiga_answer': clean_text(item['Saiga']),
+            'giga_answer': clean_text(item['Giga']),
+            'hse_ai_answer': clean_text(item['Ответ AI']), # добавлено
             'winner': item['Кто лучше?'],
             'comment': item['Комментарий'],
-            'contexts': _parse_contexts(item['Ресурсы для ответа']),
-            'grade': random.getrandbits(1) # mock оценка ответа от пользователя
+            'contexts': parse_contexts(item['Ресурсы для ответа']),
         }
 
         if item.get('Уточненный вопрос пользователя'):
             parsed.update({
-                'refined_question': _clean_text(item['Уточненный вопрос пользователя']),
-                'refined_answer': _clean_text(item['Ответ AI (уточнение)']),
-                'refined_contexts': _parse_contexts(item['Ресурсы для ответа (уточнение)'] or '')
+                'refined_question': clean_text(item['Уточненный вопрос пользователя']),
+                'refined_answer': clean_text(item['Ответ AI (уточнение)']),
+                'refined_contexts': parse_contexts(item['Ресурсы для ответа (уточнение)'] or '')
             })
 
         if include_time:
@@ -53,7 +52,7 @@ def _parse_data(file_path: str, include_time: bool) -> List[Dict[str, Any]]:
     
     return result
 
-def _parse_contexts(resources: str) -> List[Dict[str, Any]]:
+def parse_contexts(resources: str) -> List[Dict[str, Any]]:
     """Парсинг контекстов с использованием вашей функции"""
     contexts = []
     pattern = re.compile(r"Document\(page_content='(.*?)', metadata=({.*?})\)", re.DOTALL)
@@ -62,10 +61,10 @@ def _parse_contexts(resources: str) -> List[Dict[str, Any]]:
         content, metadata_str = match.groups()
         try:
             metadata = ast.literal_eval(metadata_str)
-            tags = _extract_tags(metadata)
+            tags = extract_tags(metadata)
             
             contexts.append({
-                'text': _clean_text(content),
+                'text': clean_text(content),
                 'metadata': {
                     'source': metadata.get('source'),
                     'file_name': metadata.get('file_name'),
@@ -78,14 +77,14 @@ def _parse_contexts(resources: str) -> List[Dict[str, Any]]:
     
     return contexts
 
-def _extract_tags(metadata: Dict) -> Dict[str, List[str]]:
+def extract_tags(metadata: Dict) -> Dict[str, List[str]]:
     """Извлечение тегов в отдельные категории"""
     return {
         'topic_tags': [v for k,v in metadata.items() if k.startswith('topic_tag_') and v],
         'user_tags': [v for k,v in metadata.items() if k.startswith('user_tag_') and v]
     }
 
-def _clean_text(text: str) -> str:
+def clean_text(text: str) -> str:
     """Очистка текста"""
     if not text: return ''
     return re.sub(r'\\[nrt]|[\n\r\t]+|\s+', ' ', text).strip()
